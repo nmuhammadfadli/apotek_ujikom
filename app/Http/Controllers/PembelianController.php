@@ -3,81 +3,138 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pembelian;
+use App\Models\DetailPembelian;
+use App\Models\Obat;
+use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PembelianController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
-         $q = $request->query('q');
-            $pembelians = Pembelian::with('supplier')
-                ->when($q, fn($qb) => $qb->where('nm_obat', 'like', "%{$q}%"))
-                ->paginate(15);
-            return view('pembelian.index', compact('pembelians'));
+        $q = $request->query('q');
+        $pembelians = Pembelian::with('supplier')
+            ->when($q, fn($qb) => $qb->where('nota','like', "%{$q}%")
+                ->orWhereHas('supplier', fn($q2) => $q2->where('nm_supplier','like', "%{$q}%")))
+            ->orderBy('created_at','desc')
+            ->paginate(15);
+
+        return view('pembelian.index', compact('pembelians'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
+    // show POS form
     public function create()
     {
-         $suppliers = Supplier::paginate(15);
-        return view('pembelian.create', compact('suppliers'));
+        $obats = Obat::orderBy('nm_obat')->get(['kd_obat','nm_obat','harga_beli','stok']);
+        $suppliers = Supplier::orderBy('nm_supplier')->get(['id','nm_supplier']);
+        return view('pembelian.pos', compact('obats','suppliers'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    // store header + details in one transaction
     public function store(Request $request)
     {
+        // decode items JSON string if submitted as hidden input
+        $itemsRaw = $request->input('items');
+        if (is_string($itemsRaw)) {
+            $itemsDecoded = json_decode($itemsRaw, true);
+            $request->merge(['items' => $itemsDecoded]);
+        }
+
         $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id',
-            'tgl_pembelian' => 'required|date',
-            'total_harga' => 'required|numeric'
+            'kd_supplier' => ['required', Rule::exists((new Supplier)->getTable(), 'id')],
+            'tgl_nota' => ['required','date'],
+            'diskon' => ['nullable','numeric','min:0'],
+            'items' => ['required','array','min:1'],
+            'items.*.kd_obat' => ['required', Rule::exists((new Obat)->getTable(), 'kd_obat')],
+            'items.*.jumlah' => ['required','integer','min:1'],
+            'items.*.harga_satuan' => ['required','numeric','min:0'],
         ]);
-        Pembelian::create($request->all());
-        return redirect()->route('pembelian.index')->with('success', 'Pembelian ditambahkan.');
+
+        $items = $request->input('items');
+        $diskon = $request->input('diskon', 0);
+        $kd_supplier = $request->input('kd_supplier');
+        $tgl_nota = $request->input('tgl_nota');
+
+        DB::beginTransaction();
+        try {
+            // generate nota pembelian
+            $nota = 'PB-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
+
+            // compute totals (optional)
+            $totalBefore = 0;
+            foreach ($items as $it) {
+                $totalBefore += ($it['jumlah'] * $it['harga_satuan']);
+            }
+
+            // create pembelian header
+            $pembelian = Pembelian::create([
+                'nota' => $nota,
+                'tgl_nota' => $tgl_nota,
+                'kd_supplier' => $kd_supplier,
+                'diskon' => $diskon,
+                // add other columns if exist
+            ]);
+
+            // create details & increase stock (use lockForUpdate)
+            foreach ($items as $it) {
+                $obat = Obat::lockForUpdate()->findOrFail($it['kd_obat']);
+
+                // create detail row
+                DetailPembelian::create([
+                    'nota' => $nota,
+                    'kd_obat' => $obat->kd_obat,
+                    'jumlah' => $it['jumlah'],
+                    'harga_satuan' => $it['harga_satuan'],
+                ]);
+
+                // increment stok
+                $obat->increment('stok', $it['jumlah']);
+            }
+
+            DB::commit();
+
+            return redirect()->route('pembelian.show', $pembelian)->with('success','Pembelian berhasil disimpan.');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return back()->withInput()->withErrors(['error' => $e->getMessage()]);
+        }
     }
 
-    /**
-     * Display the specified resource.
-     */
+    // show pembelian header + details
     public function show(Pembelian $pembelian)
     {
-        return view('pembelian.show', compact('pembelian'));
+        $pembelian->load('detail.obat','supplier');
+        $subtotal = $pembelian->detail->sum(fn($d)=> $d->jumlah * $d->harga_satuan);
+        $diskon = (float) ($pembelian->diskon ?? 0);
+        $discountAmount = ($diskon>0 && $diskon<=100) ? ($subtotal * $diskon / 100) : $diskon;
+        $total = max(0, $subtotal - $discountAmount);
+
+        return view('pembelian.show', compact('pembelian','subtotal','discountAmount','total'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
     public function edit(Pembelian $pembelian)
     {
-        $suppliers = Supplier::all();
+        $suppliers = Supplier::orderBy('nm_supplier')->get();
         return view('pembelian.edit', compact('pembelian','suppliers'));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Pembelian $pembelian)
     {
         $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id',
-            'tgl_pembelian' => 'required|date',
-            'total_harga' => 'required|numeric'
+            'kd_supplier' => ['required', Rule::exists((new Supplier)->getTable(), 'id')],
+            'tgl_nota' => ['required','date'],
+            'diskon' => ['nullable','numeric'],
         ]);
-        $pembelian->update($request->all());
+        $pembelian->update($request->only(['kd_supplier','tgl_nota','diskon']));
         return redirect()->route('pembelian.index')->with('success', 'Pembelian diperbarui');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Pembelian $pembelian)
     {
+        // OPTIONAL: implement rollback stok if you want to delete (careful!)
         $pembelian->delete();
         return back()->with('success','Pembelian dihapus');
     }

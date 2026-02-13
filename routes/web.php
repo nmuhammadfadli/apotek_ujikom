@@ -8,6 +8,7 @@ use App\Http\Controllers\PenjualanController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\PelangganController;
 use App\Http\Controllers\ObatController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuthController;
 
 /*
@@ -24,10 +25,9 @@ use App\Http\Controllers\AuthController;
 // Route publik / home
 Route::get('/', function(){ return redirect()->route('dashboard'); })->name('home');
 
-// dashboard route (kedua role boleh)
-Route::get('/dashboard', function(){
-    return view('dashboard');
-})->middleware('auth')->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware('auth')
+    ->name('dashboard');
 
 
 /*

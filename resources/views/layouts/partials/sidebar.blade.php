@@ -9,6 +9,14 @@
         {{-- OWNER ONLY MENU --}}
         @if($u && $u->isOwner())
           <li class="nav-item">
+            <a class="nav-link {{ request()->routeIs('das.*') ? 'active' : '' }}" href="{{ route('dashboard') }}" title="Dashboard">
+              <span class="nav-link-icon d-none d-lg-inline-flex">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h18"/><path d="M5 7v14h14V7"/></svg>
+              </span>
+              <span class="nav-link-title">Dashboard</span>
+            </a>
+          </li>
+        <li class="nav-item">
             <a class="nav-link {{ request()->routeIs('obat.*') ? 'active' : '' }}" href="{{ route('obat.index') }}" title="Obat">
               <span class="nav-link-icon d-none d-lg-inline-flex">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="7" width="18" height="10" rx="2"/><path d="M8 7v10"/><path d="M16 7v10"/></svg>

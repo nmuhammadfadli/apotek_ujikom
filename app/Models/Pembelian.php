@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Models;
+use App\Models\DetailPembelian;
 use Illuminate\Database\Eloquent\Model;
 
 class Pembelian extends Model
@@ -13,7 +14,7 @@ class Pembelian extends Model
 
     public function detail()
     {
-        return $this->hasMany(PembelianDetail::class, 'nota', 'nota');
+        return $this->hasMany(DetailPembelian::class, 'nota', 'nota');
     }
     public function supplier(){ return $this->belongsTo(Supplier::class, 'kd_supplier', 'id'); }
 }
