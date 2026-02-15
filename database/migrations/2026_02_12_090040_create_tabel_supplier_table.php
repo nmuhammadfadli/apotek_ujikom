@@ -12,11 +12,11 @@ return new class extends Migration
     public function up()
     {
         Schema::create('supplier', function (Blueprint $table) {
-            $table->id('id'); // kdSupplier original -> gunakan id
-            $table->string('nm_supplier');
-            $table->text('alamat')->nullable();
-            $table->string('kota')->nullable();
-            $table->string('telpon')->nullable();
+            $table->id('id'); 
+            $table->string('nm_supplier', 100);
+            $table->text('alamat', 150)->nullable();
+            $table->string('kota', 100)->nullable();
+            $table->string('telpon', 20)->nullable();
             $table->timestamps();
         });
     }

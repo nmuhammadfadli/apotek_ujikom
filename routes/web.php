@@ -22,19 +22,12 @@ use App\Http\Controllers\AuthController;
 |
 */
 
-// Route publik / home
 Route::get('/', function(){ return redirect()->route('dashboard'); })->name('home');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware('auth')
     ->name('dashboard');
 
-
-/*
-|--------------------------------------------------------------------------
-| MASTER DATA (CRUD)
-|--------------------------------------------------------------------------
-*/
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
@@ -50,7 +43,7 @@ Route::middleware(['auth','role:pegawai,owner'])->group(function(){
     Route::delete('penjualan/detail/{detail}', [\App\Http\Controllers\DetailPenjualanController::class,'destroy'])->name('penjualan.detail.destroy');
 });
 
-// Owner can access everything (master + pembelian + other)
+// Owner bisa mengakses semua fitur pada website
 Route::middleware(['auth','role:owner'])->group(function(){
     Route::resource('obat', \App\Http\Controllers\ObatController::class);
     Route::resource('supplier', \App\Http\Controllers\SupplierController::class);

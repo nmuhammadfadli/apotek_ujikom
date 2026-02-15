@@ -76,7 +76,5 @@
 
 @push('scripts')
 <script>
-  // opsional: konfirmasi hapus sudah ditangani inline di form onsubmit
-  // jika mau ajax delete, saya bisa bantu ubah.
 </script>
 @endpush

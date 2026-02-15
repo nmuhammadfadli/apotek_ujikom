@@ -6,6 +6,7 @@ use App\Models\Penjualan;
 use App\Models\DetailPenjualan;
 use App\Models\Obat;
 use App\Models\Pelanggan;
+use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Illuminate\Validation\Rule;
 
 class PenjualanController extends Controller
 {
-    // index: cari by nota or pelanggan
+   //cari nota
     public function index(Request $request)
     {
         $q = $request->query('q');
@@ -26,7 +27,7 @@ class PenjualanController extends Controller
         return view('penjualan.index', compact('penjualans'));
     }
 
-    // show POS create form
+    // POS create form
     public function create()
     {
         // load data yang dibutuhkan oleh POS
@@ -61,7 +62,7 @@ class PenjualanController extends Controller
 
         DB::beginTransaction();
         try {
-            // generate nota unik (string)
+            // generate nota unik 
             $nota = 'PJ-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
 
             // compute total before discount
@@ -70,7 +71,7 @@ class PenjualanController extends Controller
                 $totalBefore += ($it['jumlah'] * $it['harga_satuan']);
             }
 
-            // apply discount (we'll treat diskon as percentage if >0 and <=100)
+            // apply discount 
             $discountAmount = 0;
             if ($diskon && $diskon > 0 && $diskon <= 100) {
                 $discountAmount = ($totalBefore * $diskon) / 100.0;
@@ -90,9 +91,9 @@ class PenjualanController extends Controller
                 // you can store total if you have a column, else compute from details when needed
             ]);
 
-            // insert detail rows & update stok (with lock)
+            // insert detail rows & update stok 
             foreach ($items as $it) {
-                // lock obat row for update
+               
                 $obat = Obat::lockForUpdate()->findOrFail($it['kd_obat']);
 
                 if ($obat->stok < $it['jumlah']) {
@@ -107,7 +108,7 @@ class PenjualanController extends Controller
                     'harga_satuan' => $it['harga_satuan'],
                 ]);
 
-                // decrement stok
+                
                 $obat->decrement('stok', $it['jumlah']);
             }
 
@@ -120,25 +121,23 @@ class PenjualanController extends Controller
         }
     }
 
-    // show detail page (nota)
+   
 public function show(Penjualan $penjualan)
 {
-    // pastikan relasi yang dibutuhkan di-load: detail + hubungan obat pada tiap detail + pelanggan
+ 
     $penjualan->load(['detail.obat', 'pelanggan']);
 
-    // hitung total (dihitung dari detail)
     $subtotal = $penjualan->detail->sum(function ($d) {
         return $d->jumlah * $d->harga_satuan;
     });
 
-    // hitung diskon (anggap diskon kolom menyimpan persentase 0-100; jika absolute,
-    // sesuaikan logika)
+  
     $diskon = (float) ($penjualan->diskon ?? 0);
     $discountAmount = 0;
     if ($diskon > 0 && $diskon <= 100) {
         $discountAmount = ($subtotal * $diskon) / 100;
     } elseif ($diskon > 100) {
-        $discountAmount = $diskon; // already absolute
+        $discountAmount = $diskon; 
     }
     $total = max(0, $subtotal - $discountAmount);
 

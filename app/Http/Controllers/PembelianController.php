@@ -36,7 +36,7 @@ class PembelianController extends Controller
     // store header + details in one transaction
     public function store(Request $request)
     {
-        // decode items JSON string if submitted as hidden input
+       
         $itemsRaw = $request->input('items');
         if (is_string($itemsRaw)) {
             $itemsDecoded = json_decode($itemsRaw, true);
@@ -60,10 +60,9 @@ class PembelianController extends Controller
 
         DB::beginTransaction();
         try {
-            // generate nota pembelian
+           
             $nota = 'PB-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
-
-            // compute totals (optional)
+          
             $totalBefore = 0;
             foreach ($items as $it) {
                 $totalBefore += ($it['jumlah'] * $it['harga_satuan']);
@@ -75,14 +74,14 @@ class PembelianController extends Controller
                 'tgl_nota' => $tgl_nota,
                 'kd_supplier' => $kd_supplier,
                 'diskon' => $diskon,
-                // add other columns if exist
+                
             ]);
 
-            // create details & increase stock (use lockForUpdate)
+            // create details & increase stock 
             foreach ($items as $it) {
                 $obat = Obat::lockForUpdate()->findOrFail($it['kd_obat']);
 
-                // create detail row
+                
                 DetailPembelian::create([
                     'nota' => $nota,
                     'kd_obat' => $obat->kd_obat,
@@ -90,7 +89,7 @@ class PembelianController extends Controller
                     'harga_satuan' => $it['harga_satuan'],
                 ]);
 
-                // increment stok
+                
                 $obat->increment('stok', $it['jumlah']);
             }
 
@@ -134,7 +133,7 @@ class PembelianController extends Controller
 
     public function destroy(Pembelian $pembelian)
     {
-        // OPTIONAL: implement rollback stok if you want to delete (careful!)
+       
         $pembelian->delete();
         return back()->with('success','Pembelian dihapus');
     }
